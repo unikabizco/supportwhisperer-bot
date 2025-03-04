@@ -8,6 +8,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: number;
+  automated?: boolean; // Added this flag to indicate automated responses
 }
 
 export interface ConversationContext {
