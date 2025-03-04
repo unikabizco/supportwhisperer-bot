@@ -1,82 +1,87 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { Bot, User, ExternalLink, ShoppingCart } from 'lucide-react';
 
-interface MessageDisplayProps {
-  message: {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
+interface MessageProps {
+  message: { 
+    role: 'user' | 'assistant' | 'system'; 
+    content: string; 
     timestamp?: number;
     automated?: boolean;
   };
   detectIntent?: (content: string) => string | null;
 }
 
-// Helper function to format timestamps
-const formatTimestamp = (timestamp?: number): string => {
-  if (!timestamp) return '';
+const MessageDisplay: React.FC<MessageProps> = ({ message, detectIntent }) => {
+  const isUser = message.role === 'user';
+  const intentType = !isUser && detectIntent ? detectIntent(message.content) : null;
   
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
-
-const MessageDisplay: React.FC<MessageDisplayProps> = ({ message, detectIntent }) => {
-  const isUserMessage = message.role === 'user';
-  const intent = isUserMessage && detectIntent ? detectIntent(message.content) : null;
-  const isAutomated = message.role === 'assistant' && message.automated;
-
+  // Check if message contains a browsing result
+  const hasBrowsingResult = !isUser && message.content.includes('[RETRIEVED DATA]') || 
+                           message.content.includes('Amazon Product Information:') ||
+                           message.content.includes('Source:');
+  
+  // For messages with browsing data, we'll add a special icon
+  const BrowsingIcon = message.content.includes('Amazon Product Information:') ? 
+                      ShoppingCart : ExternalLink;
+  
   return (
-    <div
-      className={cn(
-        "flex w-full",
-        isUserMessage ? "justify-end" : "justify-start"
-      )}
-    >
-      <div className="flex flex-col max-w-[80%]">
-        {/* Intent tag for user messages */}
-        {intent && (
-          <span className="text-xs text-gray-500 self-end mb-1 mr-1">
-            {intent}
-          </span>
-        )}
-        
-        <div
-          className={cn(
-            "px-4 py-2 rounded-2xl animate-in slide-in-from-bottom duration-300",
-            isUserMessage 
-              ? "bg-primary text-white rounded-br-none" 
-              : isAutomated
-                ? "bg-blue-50 text-gray-800 rounded-bl-none border border-blue-100"
-                : "bg-gray-100 text-gray-800 rounded-bl-none"
-          )}
-        >
-          {message.content.split('\n').map((text, i) => (
-            <React.Fragment key={i}>
-              {text}
-              {i !== message.content.split('\n').length - 1 && <br />}
-            </React.Fragment>
-          ))}
+    <div className={cn(
+      "flex w-full",
+      isUser ? "justify-end" : "justify-start"
+    )}>
+      <div className={cn(
+        "flex items-start max-w-[80%]",
+        isUser ? "flex-row-reverse" : "flex-row"
+      )}>
+        <div className={cn(
+          "flex items-center justify-center h-8 w-8 rounded-full mr-2",
+          isUser ? "bg-primary text-white ml-2 mr-0" : "bg-gray-100 text-gray-600"
+        )}>
+          {isUser ? <User size={16} /> : <Bot size={16} />}
         </div>
         
-        {/* Automated response indicator */}
-        {isAutomated && (
-          <span className="text-xs text-blue-500 italic mt-1 ml-1">
-            Auto-response
-          </span>
-        )}
-        
-        {/* Timestamp */}
-        {message.timestamp && (
-          <span 
-            className={cn(
-              "text-xs text-gray-500 mt-1",
-              isUserMessage ? "self-end mr-1" : "self-start ml-1"
-            )}
-          >
-            {formatTimestamp(message.timestamp)}
-          </span>
-        )}
+        <div className={cn(
+          "rounded-2xl px-4 py-2 space-y-2",
+          isUser 
+            ? "bg-primary text-white rounded-br-none" 
+            : "bg-gray-100 text-gray-800 rounded-bl-none"
+        )}>
+          {/* If there's browsing data, add an indicator */}
+          {hasBrowsingResult && (
+            <div className={cn(
+              "flex items-center text-xs pb-1 italic",
+              isUser ? "text-white opacity-80" : "text-gray-500"
+            )}>
+              <BrowsingIcon size={12} className="inline mr-1" />
+              <span>Used web browsing to find this information</span>
+            </div>
+          )}
+          
+          {/* Regular message display */}
+          <div className="whitespace-pre-wrap">
+            {message.content}
+          </div>
+          
+          {/* Timestamp or automated indicator */}
+          {(message.timestamp || message.automated) && (
+            <div className={cn(
+              "text-xs italic flex justify-end",
+              isUser ? "text-white opacity-70" : "text-gray-500"
+            )}>
+              {message.automated && <span>Automated Response</span>}
+              {message.timestamp && !message.automated && (
+                <span>
+                  {new Date(message.timestamp).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
