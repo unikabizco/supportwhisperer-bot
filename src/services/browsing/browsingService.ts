@@ -161,7 +161,9 @@ export const browsingService = {
         const html = await response.text();
         
         // Extract relevant content
-        const { content, metadata } = extractContent(html, request.url, extractionType);
+        // Fix: Cast the extractionType to the expected type
+        const typedExtractionType = extractionType as 'full' | 'product' | 'article' | 'review';
+        const { content, metadata } = extractContent(html, request.url, typedExtractionType);
         
         // Create successful response
         const browsingResponse: BrowsingResponse = {
