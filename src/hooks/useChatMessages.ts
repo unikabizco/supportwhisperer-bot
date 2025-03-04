@@ -1,16 +1,13 @@
 
 import { useState, useEffect } from 'react';
 import { chatContextManager, ChatMessage } from '@/services/chat';
-import { toast } from 'sonner';
 import { getAutomatedResponse } from '@/services/chat/automatedResponses';
 
 /**
- * Hook for managing chat messages and loading state
- * Now supports automated responses for common questions
+ * Hook for managing chat messages and automated responses
  */
 export const useChatMessages = (isOpen: boolean) => {
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant' | 'system'; content: string; timestamp?: number }>>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [useAutomation, setUseAutomation] = useState(true);
 
   // Load messages from context on initial render
@@ -55,8 +52,6 @@ export const useChatMessages = (isOpen: boolean) => {
   return {
     messages,
     setMessages,
-    isLoading,
-    setIsLoading,
     useAutomation,
     setUseAutomation,
     checkForAutomatedResponse

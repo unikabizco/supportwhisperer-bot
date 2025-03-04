@@ -6,24 +6,21 @@ import ChatHeader from './ChatHeader';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 import ApiKeyModal from './ApiKeyModal';
-import { claudeService } from '@/services/claude';
-import { chatContextManager, ChatMessage } from '@/services/chat';
-import { toast } from 'sonner';
+import { ChatMessage } from '@/services/chat';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useChatScroll } from '@/hooks/useChatScroll';
 import { detectMessageIntent } from '@/services/chat/automatedResponses';
+import { useChatMessageHandling } from '@/hooks/useChatMessageHandling';
+import { useConversationManagement } from '@/hooks/useConversationManagement';
 
 const ChatContainer = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   
   // Custom hooks
   const { 
     messages, 
     setMessages, 
-    isLoading, 
-    setIsLoading,
     useAutomation,
     setUseAutomation,
     checkForAutomatedResponse
@@ -31,101 +28,15 @@ const ChatContainer = () => {
   
   const isOnline = useNetworkStatus(isOpen);
   const { containerRef, scrollToBottom } = useChatScroll(messages, isOpen);
-
-  // Clear conversation history
-  const handleClearConversation = () => {
-    if (window.confirm("Are you sure you want to clear the conversation history?")) {
-      chatContextManager.clearContext();
-      
-      const initialMessage: ChatMessage = {
-        role: 'assistant',
-        content: "Hello! I'm your customer support assistant. How can I help you with our electronics products today?",
-        timestamp: Date.now()
-      };
-      
-      chatContextManager.addMessage(initialMessage);
-      setMessages([initialMessage]);
-      toast.success("Conversation history cleared");
-    }
-  };
-
-  const handleSendMessage = async (message: string) => {
-    if (!message.trim()) return;
-    
-    // Check if online before proceeding
-    if (!navigator.onLine) {
-      toast.error("You're offline. Please check your internet connection.");
-      return;
-    }
-    
-    const userMessage: ChatMessage = { 
-      role: 'user', 
-      content: message,
-      timestamp: Date.now()
-    };
-    
-    // Update UI immediately
-    setMessages(prev => [...prev, userMessage]);
-    
-    // Check for automated response before calling the API
-    const automatedResponse = checkForAutomatedResponse(userMessage);
-    
-    if (automatedResponse) {
-      // Add automated response to context
-      chatContextManager.addMessage(userMessage);
-      chatContextManager.addMessage(automatedResponse);
-      
-      // Update UI with both messages
-      setTimeout(() => {
-        setMessages(prev => [...prev, automatedResponse]);
-        scrollToBottom();
-      }, 500); // Small delay to simulate typing
-      
-      return;
-    }
-    
-    // If no automated response, proceed with Claude API
-    setIsLoading(true);
-    
-    try {
-      // Check if API key exists
-      const apiKey = localStorage.getItem('claude_api_key');
-      if (!apiKey) {
-        setShowSettings(true);
-        setIsLoading(false);
-        return;
-      }
-      
-      // Send to Claude AI with updated service
-      const assistantResponse = await claudeService.sendMessage(userMessage);
-      
-      // Get updated message list from context manager
-      const updatedContext = chatContextManager.getContext();
-      if (updatedContext) {
-        setMessages(updatedContext.messages);
-      }
-    } catch (error) {
-      console.error('Error getting AI response:', error);
-      
-      // Add error message for user if not already handled by the service
-      if (!error.message || (
-          error.message !== 'offline' && 
-          error.message !== 'timeout' && 
-          !error.message.includes('API error'))) {
-        const errorMessage: ChatMessage = {
-          role: 'assistant', 
-          content: "I'm sorry, I'm having trouble connecting to my knowledge base. Please try again or contact our support team directly.",
-          timestamp: Date.now()
-        };
-        
-        chatContextManager.addMessage(errorMessage);
-        setMessages(prev => [...prev, errorMessage]);
-      }
-    } finally {
-      setIsLoading(false);
-      setTimeout(scrollToBottom, 100);
-    }
-  };
+  
+  const {
+    isLoading,
+    showSettings,
+    setShowSettings,
+    handleSendMessage
+  } = useChatMessageHandling(messages, setMessages, checkForAutomatedResponse, scrollToBottom);
+  
+  const { handleClearConversation } = useConversationManagement(setMessages);
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
