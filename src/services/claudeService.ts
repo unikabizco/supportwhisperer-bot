@@ -1,10 +1,9 @@
-
 /**
  * Claude AI API service for handling chat interactions
  * @module services/claudeService
  */
 import { toast } from "sonner";
-import { chatContextManager, ChatMessage } from "./chatContextManager";
+import { chatContextManager, ChatMessage } from "./chat";
 
 // Type definitions for Claude API
 interface ClaudeMessage {
