@@ -3,10 +3,10 @@
  * Amazon product search implementation
  * @module services/amazon/amazonProductSearch
  */
-import { toast } from "sonner";
 import { ProductSearchParams, ProductSearchResult, AmazonProduct, DEFAULT_MAX_RESULTS } from './types';
 import { browsingService } from '../browsing';
 import { amazonUrlUtils } from './amazonUrlUtils';
+import { amazonErrorHandler, AmazonErrorType } from './amazonErrorHandler';
 
 /**
  * Product search functionality for Amazon
@@ -19,6 +19,14 @@ export const amazonProductSearch = {
    */
   async searchProducts(params: ProductSearchParams): Promise<ProductSearchResult> {
     try {
+      // Validate search parameters
+      if (!params.keywords || params.keywords.trim() === '') {
+        return amazonErrorHandler.createErrorResponse(
+          'Search keywords cannot be empty',
+          AmazonErrorType.VALIDATION
+        ) as ProductSearchResult;
+      }
+      
       // Construct search URL
       const searchUrl = amazonUrlUtils.constructSearchUrl(params);
       
@@ -30,11 +38,11 @@ export const amazonProductSearch = {
       });
       
       if (!browsingResult.success) {
-        return {
-          success: false,
-          products: [],
-          error: browsingResult.error || 'Failed to search products'
-        };
+        return amazonErrorHandler.createErrorResponse(
+          browsingResult.error || 'Failed to search products',
+          AmazonErrorType.UNKNOWN,
+          { originalError: browsingResult.error }
+        ) as ProductSearchResult;
       }
       
       // In a real implementation, we would parse the HTML to extract product data
@@ -83,13 +91,7 @@ export const amazonProductSearch = {
         totalResults: products.length
       };
     } catch (error) {
-      console.error('Error searching Amazon products:', error);
-      
-      return {
-        success: false,
-        products: [],
-        error: `Error searching products: ${error.message || 'Unknown error'}`
-      };
+      return amazonErrorHandler.handleError(error, 'product search') as ProductSearchResult;
     }
   }
 };

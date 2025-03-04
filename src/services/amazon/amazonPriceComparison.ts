@@ -3,7 +3,8 @@
  * Amazon price comparison utilities
  * @module services/amazon/amazonPriceComparison
  */
-import { amazonService } from './amazonService';
+import { amazonProductDetails } from './amazonProductDetails';
+import { amazonErrorHandler, AmazonErrorType } from './amazonErrorHandler';
 
 /**
  * Utilities for Amazon price comparisons
@@ -22,25 +23,42 @@ export const amazonPriceComparison = {
     percentageDifference?: number;
     isCheaper?: boolean;
     error?: string;
+    errorType?: string;
   }> {
     try {
+      // Validate inputs
+      if (!asin || asin.trim() === '') {
+        return amazonErrorHandler.createErrorResponse(
+          'ASIN cannot be empty',
+          AmazonErrorType.VALIDATION
+        );
+      }
+      
+      if (typeof ourPrice !== 'number' || isNaN(ourPrice)) {
+        return amazonErrorHandler.createErrorResponse(
+          'Our price must be a valid number',
+          AmazonErrorType.VALIDATION
+        );
+      }
+      
       // Get product details
-      const productResult = await amazonService.getProductDetails(asin);
+      const productResult = await amazonProductDetails.getProductDetails(asin);
       
       if (!productResult.success || !productResult.product) {
-        return {
-          success: false,
-          error: productResult.error || 'Failed to retrieve product for price comparison'
-        };
+        return amazonErrorHandler.createErrorResponse(
+          productResult.error || 'Failed to retrieve product for price comparison',
+          AmazonErrorType.UNKNOWN,
+          { originalError: productResult.error }
+        );
       }
       
       const amazonPrice = productResult.product.price?.amount || 0;
       
       if (amazonPrice === 0) {
-        return {
-          success: false,
-          error: 'Amazon price not available for comparison'
-        };
+        return amazonErrorHandler.createErrorResponse(
+          'Amazon price not available for comparison',
+          AmazonErrorType.NOT_FOUND
+        );
       }
       
       // Calculate price difference
@@ -55,12 +73,7 @@ export const amazonPriceComparison = {
         isCheaper: priceDifference < 0
       };
     } catch (error) {
-      console.error('Error comparing prices:', error);
-      
-      return {
-        success: false,
-        error: `Error comparing prices: ${error.message || 'Unknown error'}`
-      };
+      return amazonErrorHandler.handleError(error, 'price comparison');
     }
   }
 };

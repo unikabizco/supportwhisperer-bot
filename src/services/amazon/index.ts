@@ -10,3 +10,4 @@ export { amazonUrlUtils } from './amazonUrlUtils';
 export { amazonProductSearch } from './amazonProductSearch';
 export { amazonProductDetails } from './amazonProductDetails';
 export { amazonPriceComparison } from './amazonPriceComparison';
+export { amazonErrorHandler, AmazonErrorType } from './amazonErrorHandler';

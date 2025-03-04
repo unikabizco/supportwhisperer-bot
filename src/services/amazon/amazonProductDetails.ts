@@ -7,6 +7,7 @@ import { ProductDetailsResult, AmazonProduct } from './types';
 import { browsingService } from '../browsing';
 import { amazonCache } from './amazonCache';
 import { amazonUrlUtils } from './amazonUrlUtils';
+import { amazonErrorHandler, AmazonErrorType } from './amazonErrorHandler';
 
 /**
  * Product details functionality for Amazon
@@ -19,6 +20,14 @@ export const amazonProductDetails = {
    */
   async getProductDetails(asin: string): Promise<ProductDetailsResult> {
     try {
+      // Validate ASIN
+      if (!asin || asin.trim() === '') {
+        return amazonErrorHandler.createErrorResponse(
+          'ASIN cannot be empty',
+          AmazonErrorType.VALIDATION
+        ) as ProductDetailsResult;
+      }
+      
       // Check cache first
       const cached = amazonCache.getCachedProduct(asin);
       if (cached) {
@@ -39,10 +48,11 @@ export const amazonProductDetails = {
       });
       
       if (!browsingResult.success) {
-        return {
-          success: false,
-          error: browsingResult.error || 'Failed to retrieve product details'
-        };
+        return amazonErrorHandler.createErrorResponse(
+          browsingResult.error || 'Failed to retrieve product details',
+          AmazonErrorType.UNKNOWN,
+          { originalError: browsingResult.error }
+        ) as ProductDetailsResult;
       }
       
       // In a real implementation, we would parse the HTML to extract product data
@@ -71,12 +81,7 @@ export const amazonProductDetails = {
         product
       };
     } catch (error) {
-      console.error('Error getting Amazon product details:', error);
-      
-      return {
-        success: false,
-        error: `Error retrieving product details: ${error.message || 'Unknown error'}`
-      };
+      return amazonErrorHandler.handleError(error, 'product details retrieval') as ProductDetailsResult;
     }
   }
 };
