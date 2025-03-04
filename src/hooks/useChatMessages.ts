@@ -2,13 +2,16 @@
 import { useState, useEffect } from 'react';
 import { chatContextManager, ChatMessage } from '@/services/chat';
 import { toast } from 'sonner';
+import { getAutomatedResponse } from '@/services/chat/automatedResponses';
 
 /**
  * Hook for managing chat messages and loading state
+ * Now supports automated responses for common questions
  */
 export const useChatMessages = (isOpen: boolean) => {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant' | 'system'; content: string; timestamp?: number }>>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [useAutomation, setUseAutomation] = useState(true);
 
   // Load messages from context on initial render
   useEffect(() => {
@@ -30,10 +33,32 @@ export const useChatMessages = (isOpen: boolean) => {
     }
   }, [isOpen]);
 
+  /**
+   * Checks if a user message can be handled by automated responses
+   * @param message The user message to check
+   * @returns An automated response or null if API is needed
+   */
+  const checkForAutomatedResponse = (message: ChatMessage): ChatMessage | null => {
+    if (!useAutomation || message.role !== 'user') return null;
+    
+    const automatedResponse = getAutomatedResponse(message.content);
+    if (!automatedResponse) return null;
+    
+    return {
+      role: 'assistant',
+      content: automatedResponse,
+      timestamp: Date.now(),
+      automated: true
+    };
+  };
+
   return {
     messages,
     setMessages,
     isLoading,
-    setIsLoading
+    setIsLoading,
+    useAutomation,
+    setUseAutomation,
+    checkForAutomatedResponse
   };
 };

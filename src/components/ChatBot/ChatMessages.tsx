@@ -5,10 +5,16 @@ import { Loader2 } from 'lucide-react';
 import MessageDisplay from './MessageDisplay';
 
 interface ChatMessagesProps {
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string; timestamp?: number }>;
+  messages: Array<{ 
+    role: 'user' | 'assistant' | 'system'; 
+    content: string; 
+    timestamp?: number;
+    automated?: boolean;
+  }>;
+  detectIntent?: (content: string) => string | null;
 }
 
-const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
+const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, detectIntent }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showTyping, setShowTyping] = useState(false);
 
@@ -26,23 +32,6 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
       return () => clearTimeout(timer);
     }
   }, [messages]);
-
-  // Helper to detect user intent from message content
-  const detectIntent = (content: string): string | null => {
-    const lowerContent = content.toLowerCase();
-    
-    if (lowerContent.includes('return') || lowerContent.includes('refund')) {
-      return 'returns';
-    } else if (lowerContent.includes('order') || lowerContent.includes('shipping') || lowerContent.includes('delivery')) {
-      return 'orders';
-    } else if (lowerContent.includes('warranty') || lowerContent.includes('broken') || lowerContent.includes('repair')) {
-      return 'warranty';
-    } else if (lowerContent.includes('help') || lowerContent.includes('support')) {
-      return 'support';
-    }
-    
-    return null;
-  };
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">

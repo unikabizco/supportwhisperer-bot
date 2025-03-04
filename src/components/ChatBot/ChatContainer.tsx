@@ -12,13 +12,23 @@ import { toast } from 'sonner';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useChatScroll } from '@/hooks/useChatScroll';
+import { detectMessageIntent } from '@/services/chat/automatedResponses';
 
 const ChatContainer = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
   // Custom hooks
-  const { messages, setMessages, isLoading, setIsLoading } = useChatMessages(isOpen);
+  const { 
+    messages, 
+    setMessages, 
+    isLoading, 
+    setIsLoading,
+    useAutomation,
+    setUseAutomation,
+    checkForAutomatedResponse
+  } = useChatMessages(isOpen);
+  
   const isOnline = useNetworkStatus(isOpen);
   const { containerRef, scrollToBottom } = useChatScroll(messages, isOpen);
 
@@ -56,6 +66,25 @@ const ChatContainer = () => {
     
     // Update UI immediately
     setMessages(prev => [...prev, userMessage]);
+    
+    // Check for automated response before calling the API
+    const automatedResponse = checkForAutomatedResponse(userMessage);
+    
+    if (automatedResponse) {
+      // Add automated response to context
+      chatContextManager.addMessage(userMessage);
+      chatContextManager.addMessage(automatedResponse);
+      
+      // Update UI with both messages
+      setTimeout(() => {
+        setMessages(prev => [...prev, automatedResponse]);
+        scrollToBottom();
+      }, 500); // Small delay to simulate typing
+      
+      return;
+    }
+    
+    // If no automated response, proceed with Claude API
     setIsLoading(true);
     
     try {
@@ -118,9 +147,15 @@ const ChatContainer = () => {
             onShowSettings={() => setShowSettings(true)}
             onClearConversation={handleClearConversation}
             isOnline={isOnline}
+            useAutomation={useAutomation}
+            onToggleAutomation={() => setUseAutomation(!useAutomation)}
           />
 
-          <ChatMessages messages={messages} />
+          <ChatMessages 
+            messages={messages}
+            detectIntent={detectMessageIntent}
+          />
+          
           <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!isOnline} />
           
           <ApiKeyModal 
