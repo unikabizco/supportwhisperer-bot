@@ -3,6 +3,7 @@
  * Type definitions for Amazon product service
  * @module services/amazon/types
  */
+import { AmazonErrorType } from './amazonErrorHandler';
 
 export interface AmazonProduct {
   asin: string;
@@ -35,12 +36,16 @@ export interface ProductSearchResult {
   products: AmazonProduct[];
   totalResults?: number;
   error?: string;
+  errorType?: AmazonErrorType;
+  errorDetails?: Record<string, any>;
 }
 
 export interface ProductDetailsResult {
   success: boolean;
   product?: AmazonProduct;
   error?: string;
+  errorType?: AmazonErrorType;
+  errorDetails?: Record<string, any>;
 }
 
 // Constants for Amazon service

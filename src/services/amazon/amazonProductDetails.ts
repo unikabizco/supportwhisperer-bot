@@ -22,10 +22,11 @@ export const amazonProductDetails = {
     try {
       // Validate ASIN
       if (!asin || asin.trim() === '') {
-        return amazonErrorHandler.createErrorResponse(
-          'ASIN cannot be empty',
-          AmazonErrorType.VALIDATION
-        ) as ProductDetailsResult;
+        return {
+          success: false,
+          error: 'ASIN cannot be empty',
+          errorType: AmazonErrorType.VALIDATION
+        };
       }
       
       // Check cache first
@@ -48,11 +49,12 @@ export const amazonProductDetails = {
       });
       
       if (!browsingResult.success) {
-        return amazonErrorHandler.createErrorResponse(
-          browsingResult.error || 'Failed to retrieve product details',
-          AmazonErrorType.UNKNOWN,
-          { originalError: browsingResult.error }
-        ) as ProductDetailsResult;
+        return {
+          success: false,
+          error: browsingResult.error || 'Failed to retrieve product details',
+          errorType: AmazonErrorType.UNKNOWN,
+          errorDetails: { originalError: browsingResult.error }
+        };
       }
       
       // In a real implementation, we would parse the HTML to extract product data
@@ -81,7 +83,11 @@ export const amazonProductDetails = {
         product
       };
     } catch (error) {
-      return amazonErrorHandler.handleError(error, 'product details retrieval') as ProductDetailsResult;
+      return {
+        success: false,
+        error: `Error during product details retrieval: ${error instanceof Error ? error.message : String(error)}`,
+        errorType: AmazonErrorType.UNKNOWN
+      };
     }
   }
 };

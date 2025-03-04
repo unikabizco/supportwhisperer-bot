@@ -28,37 +28,41 @@ export const amazonPriceComparison = {
     try {
       // Validate inputs
       if (!asin || asin.trim() === '') {
-        return amazonErrorHandler.createErrorResponse(
-          'ASIN cannot be empty',
-          AmazonErrorType.VALIDATION
-        );
+        return {
+          success: false,
+          error: 'ASIN cannot be empty',
+          errorType: AmazonErrorType.VALIDATION
+        };
       }
       
       if (typeof ourPrice !== 'number' || isNaN(ourPrice)) {
-        return amazonErrorHandler.createErrorResponse(
-          'Our price must be a valid number',
-          AmazonErrorType.VALIDATION
-        );
+        return {
+          success: false,
+          error: 'Our price must be a valid number',
+          errorType: AmazonErrorType.VALIDATION
+        };
       }
       
       // Get product details
       const productResult = await amazonProductDetails.getProductDetails(asin);
       
       if (!productResult.success || !productResult.product) {
-        return amazonErrorHandler.createErrorResponse(
-          productResult.error || 'Failed to retrieve product for price comparison',
-          AmazonErrorType.UNKNOWN,
-          { originalError: productResult.error }
-        );
+        return {
+          success: false,
+          error: productResult.error || 'Failed to retrieve product for price comparison',
+          errorType: productResult.errorType || AmazonErrorType.UNKNOWN,
+          errorDetails: productResult.errorDetails
+        };
       }
       
       const amazonPrice = productResult.product.price?.amount || 0;
       
       if (amazonPrice === 0) {
-        return amazonErrorHandler.createErrorResponse(
-          'Amazon price not available for comparison',
-          AmazonErrorType.NOT_FOUND
-        );
+        return {
+          success: false,
+          error: 'Amazon price not available for comparison',
+          errorType: AmazonErrorType.NOT_FOUND
+        };
       }
       
       // Calculate price difference
@@ -73,7 +77,11 @@ export const amazonPriceComparison = {
         isCheaper: priceDifference < 0
       };
     } catch (error) {
-      return amazonErrorHandler.handleError(error, 'price comparison');
+      return {
+        success: false,
+        error: `Error during price comparison: ${error instanceof Error ? error.message : String(error)}`,
+        errorType: AmazonErrorType.UNKNOWN
+      };
     }
   }
 };

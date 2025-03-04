@@ -4,6 +4,7 @@
  * @module services/amazon/amazonErrorHandler
  */
 import { toast } from "sonner";
+import { ProductSearchResult, ProductDetailsResult } from './types';
 
 /**
  * Standard error categories for Amazon service operations
@@ -47,6 +48,51 @@ export const amazonErrorHandler = {
   ): AmazonErrorResponse {
     // Log the error for debugging purposes
     console.error(`Amazon service error (${type}):`, message, details || '');
+    
+    return {
+      success: false,
+      error: message,
+      errorType: type,
+      errorDetails: details
+    };
+  },
+
+  /**
+   * Creates a product search error response
+   * @param message - Error message
+   * @param type - Error type category
+   * @param details - Additional error details
+   * @returns Error response that conforms to ProductSearchResult
+   */
+  createSearchErrorResponse(
+    message: string,
+    type: AmazonErrorType = AmazonErrorType.UNKNOWN,
+    details?: Record<string, any>
+  ): ProductSearchResult {
+    console.error(`Amazon search error (${type}):`, message, details || '');
+    
+    return {
+      success: false,
+      products: [], // Empty array to satisfy ProductSearchResult type
+      error: message,
+      errorType: type,
+      errorDetails: details
+    };
+  },
+  
+  /**
+   * Creates a product details error response
+   * @param message - Error message
+   * @param type - Error type category
+   * @param details - Additional error details
+   * @returns Error response that conforms to ProductDetailsResult
+   */
+  createDetailsErrorResponse(
+    message: string,
+    type: AmazonErrorType = AmazonErrorType.UNKNOWN,
+    details?: Record<string, any>
+  ): ProductDetailsResult {
+    console.error(`Amazon product details error (${type}):`, message, details || '');
     
     return {
       success: false,

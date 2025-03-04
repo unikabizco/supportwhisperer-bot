@@ -21,10 +21,13 @@ export const amazonProductSearch = {
     try {
       // Validate search parameters
       if (!params.keywords || params.keywords.trim() === '') {
-        return amazonErrorHandler.createErrorResponse(
-          'Search keywords cannot be empty',
-          AmazonErrorType.VALIDATION
-        ) as ProductSearchResult;
+        // Return a properly typed ProductSearchResult with empty products array
+        return {
+          success: false,
+          products: [], // Include empty products array to satisfy the type
+          error: 'Search keywords cannot be empty',
+          errorType: AmazonErrorType.VALIDATION
+        };
       }
       
       // Construct search URL
@@ -38,11 +41,14 @@ export const amazonProductSearch = {
       });
       
       if (!browsingResult.success) {
-        return amazonErrorHandler.createErrorResponse(
-          browsingResult.error || 'Failed to search products',
-          AmazonErrorType.UNKNOWN,
-          { originalError: browsingResult.error }
-        ) as ProductSearchResult;
+        // Return a properly typed ProductSearchResult with empty products array
+        return {
+          success: false,
+          products: [], // Include empty products array to satisfy the type
+          error: browsingResult.error || 'Failed to search products',
+          errorType: AmazonErrorType.UNKNOWN,
+          errorDetails: { originalError: browsingResult.error }
+        };
       }
       
       // In a real implementation, we would parse the HTML to extract product data
@@ -91,7 +97,13 @@ export const amazonProductSearch = {
         totalResults: products.length
       };
     } catch (error) {
-      return amazonErrorHandler.handleError(error, 'product search') as ProductSearchResult;
+      // Return a properly typed ProductSearchResult with empty products array
+      return {
+        success: false,
+        products: [], // Include empty products array to satisfy the type
+        error: `Error during product search: ${error instanceof Error ? error.message : String(error)}`,
+        errorType: AmazonErrorType.UNKNOWN
+      };
     }
   }
 };
