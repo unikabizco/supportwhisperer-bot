@@ -1,81 +1,43 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Settings, RotateCcw, Wifi, WifiOff } from 'lucide-react';
+import React, { useState } from 'react';
+import { cn } from '@/lib/utils';
+import ChatButton from './ChatButton';
+import ChatHeader from './ChatHeader';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 import ApiKeyModal from './ApiKeyModal';
-import { cn } from '@/lib/utils';
 import { claudeService } from '@/services/claude';
 import { chatContextManager, ChatMessage } from '@/services/chat';
 import { toast } from 'sonner';
+import { useChatMessages } from '@/hooks/useChatMessages';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useChatScroll } from '@/hooks/useChatScroll';
 
 const ChatContainer = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant' | 'system'; content: string }>>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Custom hooks
+  const { messages, setMessages, isLoading, setIsLoading } = useChatMessages(isOpen);
+  const isOnline = useNetworkStatus(isOpen);
+  const { containerRef, scrollToBottom } = useChatScroll(messages, isOpen);
 
-  // Monitor online/offline status
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      if (isOpen) {
-        toast.success("You're back online!");
-      }
-    };
-    
-    const handleOffline = () => {
-      setIsOnline(false);
-      if (isOpen) {
-        toast.error("You're currently offline. Some features may be unavailable.");
-      }
-    };
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [isOpen]);
-
-  const scrollToBottom = () => {
-    if (containerRef.current) {
-      const messagesContainer = containerRef.current.querySelector('div:first-child');
-      if (messagesContainer) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      }
+  // Clear conversation history
+  const handleClearConversation = () => {
+    if (window.confirm("Are you sure you want to clear the conversation history?")) {
+      chatContextManager.clearContext();
+      
+      const initialMessage: ChatMessage = {
+        role: 'assistant',
+        content: "Hello! I'm your customer support assistant. How can I help you with our electronics products today?",
+        timestamp: Date.now()
+      };
+      
+      chatContextManager.addMessage(initialMessage);
+      setMessages([initialMessage]);
+      toast.success("Conversation history cleared");
     }
   };
-
-  // Load messages from context on initial render
-  useEffect(() => {
-    if (isOpen) {
-      const context = chatContextManager.getContext();
-      
-      if (context && context.messages.length > 0) {
-        setMessages(context.messages);
-      } else {
-        // If no context exists, add initial greeting
-        const initialMessage: ChatMessage = {
-          role: 'assistant',
-          content: "Hello! I'm your customer support assistant. How can I help you with our electronics products today?",
-          timestamp: Date.now()
-        };
-        chatContextManager.addMessage(initialMessage);
-        setMessages([initialMessage]);
-      }
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (containerRef.current && isOpen) {
-      scrollToBottom();
-    }
-  }, [messages, isOpen]);
 
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
@@ -136,33 +98,10 @@ const ChatContainer = () => {
     }
   };
 
-  // Clear conversation history
-  const handleClearConversation = () => {
-    if (window.confirm("Are you sure you want to clear the conversation history?")) {
-      chatContextManager.clearContext();
-      
-      const initialMessage: ChatMessage = {
-        role: 'assistant',
-        content: "Hello! I'm your customer support assistant. How can I help you with our electronics products today?",
-        timestamp: Date.now()
-      };
-      
-      chatContextManager.addMessage(initialMessage);
-      setMessages([initialMessage]);
-      toast.success("Conversation history cleared");
-    }
-  };
-
   return (
     <div className="fixed bottom-4 right-4 z-50">
       {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-all duration-300"
-        >
-          <MessageCircle size={20} />
-          <span>Need help?</span>
-        </button>
+        <ChatButton onClick={() => setIsOpen(true)} />
       )}
 
       {isOpen && (
@@ -174,41 +113,12 @@ const ChatContainer = () => {
             "animate-in slide-in-from-bottom duration-300"
           )}
         >
-          <div className="flex items-center justify-between p-4 border-b">
-            <h2 className="text-lg font-semibold">Customer Support</h2>
-            <div className="flex items-center gap-2">
-              {/* Network status indicator */}
-              <div className="mr-1" title={isOnline ? "Online" : "Offline"}>
-                {isOnline ? (
-                  <Wifi size={16} className="text-green-500" />
-                ) : (
-                  <WifiOff size={16} className="text-red-500" />
-                )}
-              </div>
-              <button
-                onClick={handleClearConversation}
-                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-                aria-label="Clear conversation"
-                title="Clear conversation"
-              >
-                <RotateCcw size={16} className="text-gray-500" />
-              </button>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-                aria-label="Settings"
-              >
-                <Settings size={18} className="text-gray-500" />
-              </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-                aria-label="Close"
-              >
-                <X size={20} className="text-gray-500" />
-              </button>
-            </div>
-          </div>
+          <ChatHeader
+            onClose={() => setIsOpen(false)}
+            onShowSettings={() => setShowSettings(true)}
+            onClearConversation={handleClearConversation}
+            isOnline={isOnline}
+          />
 
           <ChatMessages messages={messages} />
           <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!isOnline} />
