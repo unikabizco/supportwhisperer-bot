@@ -24,6 +24,7 @@ export const amazonPriceComparison = {
     isCheaper?: boolean;
     error?: string;
     errorType?: string;
+    errorDetails?: Record<string, any>;
   }> {
     try {
       // Validate inputs
