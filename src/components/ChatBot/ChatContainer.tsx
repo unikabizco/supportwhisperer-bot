@@ -1,16 +1,17 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Settings } from 'lucide-react';
+import { MessageCircle, X, Settings, RotateCcw } from 'lucide-react';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 import ApiKeyModal from './ApiKeyModal';
 import { cn } from '@/lib/utils';
 import { claudeService } from '@/services/claudeService';
+import { chatContextManager, ChatMessage } from '@/services/chatContextManager';
 import { toast } from 'sonner';
 
 const ChatContainer = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant' | 'system'; content: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -24,14 +25,23 @@ const ChatContainer = () => {
     }
   };
 
+  // Load messages from context on initial render
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      setMessages([
-        {
+    if (isOpen) {
+      const context = chatContextManager.getContext();
+      
+      if (context && context.messages.length > 0) {
+        setMessages(context.messages);
+      } else {
+        // If no context exists, add initial greeting
+        const initialMessage: ChatMessage = {
           role: 'assistant',
-          content: "Hello! I'm your customer support assistant. How can I help you with our electronics products today?"
-        }
-      ]);
+          content: "Hello! I'm your customer support assistant. How can I help you with our electronics products today?",
+          timestamp: Date.now()
+        };
+        chatContextManager.addMessage(initialMessage);
+        setMessages([initialMessage]);
+      }
     }
   }, [isOpen]);
 
@@ -44,7 +54,13 @@ const ChatContainer = () => {
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
     
-    const userMessage = { role: 'user' as const, content: message };
+    const userMessage: ChatMessage = { 
+      role: 'user', 
+      content: message,
+      timestamp: Date.now()
+    };
+    
+    // Update UI immediately
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     
@@ -57,27 +73,47 @@ const ChatContainer = () => {
         return;
       }
       
-      // Send to Claude AI
-      const assistantResponse = await claudeService.sendMessage([...messages, userMessage]);
+      // Send to Claude AI with updated service
+      const assistantResponse = await claudeService.sendMessage(userMessage);
       
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: assistantResponse }
-      ]);
+      // Get updated message list from context manager
+      const updatedContext = chatContextManager.getContext();
+      if (updatedContext) {
+        setMessages(updatedContext.messages);
+      }
     } catch (error) {
       console.error('Error getting AI response:', error);
       toast.error("Failed to get a response. Please try again.");
       
-      setMessages(prev => [
-        ...prev,
-        { 
-          role: 'assistant', 
-          content: "I'm sorry, I'm having trouble connecting to my knowledge base. Please try again or contact our support team directly." 
-        }
-      ]);
+      // Add error message for user
+      const errorMessage: ChatMessage = {
+        role: 'assistant', 
+        content: "I'm sorry, I'm having trouble connecting to my knowledge base. Please try again or contact our support team directly.",
+        timestamp: Date.now()
+      };
+      
+      chatContextManager.addMessage(errorMessage);
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
       setTimeout(scrollToBottom, 100);
+    }
+  };
+
+  // Clear conversation history
+  const handleClearConversation = () => {
+    if (window.confirm("Are you sure you want to clear the conversation history?")) {
+      chatContextManager.clearContext();
+      
+      const initialMessage: ChatMessage = {
+        role: 'assistant',
+        content: "Hello! I'm your customer support assistant. How can I help you with our electronics products today?",
+        timestamp: Date.now()
+      };
+      
+      chatContextManager.addMessage(initialMessage);
+      setMessages([initialMessage]);
+      toast.success("Conversation history cleared");
     }
   };
 
@@ -105,6 +141,14 @@ const ChatContainer = () => {
           <div className="flex items-center justify-between p-4 border-b">
             <h2 className="text-lg font-semibold">Customer Support</h2>
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleClearConversation}
+                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                aria-label="Clear conversation"
+                title="Clear conversation"
+              >
+                <RotateCcw size={16} className="text-gray-500" />
+              </button>
               <button
                 onClick={() => setShowSettings(true)}
                 className="p-1 rounded-full hover:bg-gray-100 transition-colors"
