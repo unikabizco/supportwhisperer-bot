@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Trash2, Wifi, WifiOff, Robot } from 'lucide-react';
+import { X, Settings, Trash2, Wifi, WifiOff, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -48,7 +47,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   return (
     <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white/90 rounded-t-2xl shadow-sm">
       <div className="flex items-center">
-        <Robot className="mr-2 h-5 w-5 text-primary" />
+        <Bot className="mr-2 h-5 w-5 text-primary" />
         <h3 className="text-lg font-medium">
           Customer Support
         </h3>

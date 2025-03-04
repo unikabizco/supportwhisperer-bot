@@ -5,7 +5,7 @@
  */
 import { toast } from "sonner";
 import { chatContextManager, ChatMessage } from "../chat";
-import { OpenAIRequest, DEFAULT_MODEL } from "./types";
+import { OpenAIRequest, OpenAIMessage, DEFAULT_MODEL } from "./types";
 import { getEnhancedSystemPrompt } from "./systemPrompt";
 import { sendWithRetry, processResponse } from "./apiClient";
 import { handleError } from "./errorHandler";
@@ -37,15 +37,15 @@ export const openaiService = {
       // Add the new message to context
       chatContextManager.addMessage(newMessage);
       
-      // Get all messages from context
-      const contextMessages = chatContextManager.getMessagesForOpenAIAPI();
+      // Get all messages from context and ensure they're properly typed
+      const contextMessages = chatContextManager.getMessagesForOpenAIAPI() as OpenAIMessage[];
       
       // Get context summary to enhance system prompt
       const contextSummary = chatContextManager.getContextSummary();
       const enhancedSystemPrompt = getEnhancedSystemPrompt(contextSummary);
       
       // Add system message to the beginning of the messages array
-      const messagesWithSystem = [
+      const messagesWithSystem: OpenAIMessage[] = [
         { role: 'system', content: enhancedSystemPrompt },
         ...contextMessages
       ];

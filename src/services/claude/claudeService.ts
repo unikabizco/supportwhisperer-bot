@@ -5,7 +5,7 @@
  */
 import { toast } from "sonner";
 import { chatContextManager, ChatMessage } from "../chat";
-import { ClaudeRequest, DEFAULT_MODEL } from "./types";
+import { ClaudeRequest, ClaudeMessage, DEFAULT_MODEL } from "./types";
 import { getEnhancedSystemPrompt } from "./systemPrompt";
 import { sendWithRetry, processResponse } from "./apiClient";
 import { handleError } from "./errorHandler";
@@ -38,7 +38,7 @@ export const claudeService = {
       chatContextManager.addMessage(newMessage);
       
       // Get all messages from context
-      const contextMessages = chatContextManager.getMessagesForClaudeAPI();
+      const contextMessages = chatContextManager.getMessagesForClaudeAPI() as ClaudeMessage[];
       
       // Get context summary to enhance system prompt
       const contextSummary = chatContextManager.getContextSummary();
