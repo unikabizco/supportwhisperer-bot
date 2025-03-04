@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { chatContextManager, ChatMessage } from '@/services/chat';
 import { claudeService } from '@/services/claude';
 import { toast } from 'sonner';
@@ -15,13 +15,41 @@ export const useChatMessageHandling = (
 ) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Add event listeners for online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
     
     // Check if online before proceeding
-    if (!navigator.onLine) {
+    if (!isOnline) {
       toast.error("You're offline. Please check your internet connection.");
+      
+      const errorMessage: ChatMessage = {
+        role: 'assistant', 
+        content: "I notice you're currently offline. I'll need an internet connection to provide you with the best support. Please check your connection and try again.",
+        timestamp: Date.now()
+      };
+      
+      setMessages(prev => [...prev, { 
+        role: 'user', 
+        content: message,
+        timestamp: Date.now()
+      }, errorMessage]);
+      
       return;
     }
     
@@ -99,6 +127,7 @@ export const useChatMessageHandling = (
     setIsLoading,
     showSettings,
     setShowSettings,
-    handleSendMessage
+    handleSendMessage,
+    isOnline
   };
 };

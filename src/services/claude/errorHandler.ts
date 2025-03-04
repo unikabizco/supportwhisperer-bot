@@ -4,6 +4,7 @@
  * @module services/claude/errorHandler
  */
 import { toast } from "sonner";
+import { chatContextManager, ChatMessage } from "../chat";
 
 /**
  * Handles errors from Claude API and returns appropriate user-facing messages
@@ -13,27 +14,39 @@ import { toast } from "sonner";
 export function handleError(error: unknown): string {
   console.error('Error calling Claude API:', error);
   
+  // Extract the error message to add to context
+  let errorMessage = "I'm sorry, I encountered an error processing your request. Please try again later.";
+  
   // Provide more specific error message based on error type
   if (error instanceof Error) {
-    if (error.message === 'offline') {
-      toast.error("You are currently offline. Please check your internet connection.");
-      return "It looks like you're currently offline. Please check your internet connection and try again when you're back online.";
-    } else if (error.message === 'timeout') {
-      toast.error("Request timed out. The Claude AI service might be experiencing high traffic.");
-      return "I'm sorry, but the request timed out. Our AI service might be experiencing high traffic. Please try again in a few moments.";
-    } else if (error.message.includes('fetch') || error.message.includes('network')) {
+    if (error.message === 'offline' || 
+        error.message.includes('NetworkError') || 
+        error.message.includes('network')) {
+      errorMessage = "It looks like you're currently offline. Please check your internet connection and try again when you're back online.";
       toast.error("Network error when connecting to Claude AI. Please check your internet connection.");
-      return "I'm having trouble connecting to my knowledge base due to network issues. Please check your internet connection and try again in a moment. If the problem persists, our servers might be experiencing issues.";
+    } else if (error.message === 'timeout') {
+      errorMessage = "I'm sorry, but the request timed out. Our AI service might be experiencing high traffic. Please try again in a few moments.";
+      toast.error("Request timed out. The Claude AI service might be experiencing high traffic.");
+    } else if (error.message.includes('fetch') || error.message.includes('network')) {
+      errorMessage = "I'm having trouble connecting to my knowledge base due to network issues. Please check your internet connection and try again in a moment. If the problem persists, our servers might be experiencing issues.";
+      toast.error("Network error when connecting to Claude AI. Please check your internet connection.");
     } else if (error.message.includes('429')) {
+      errorMessage = "I've reached my rate limit. Please wait a moment before sending another message.";
       toast.error("Rate limit exceeded. Please try again in a few moments.");
-      return "I've reached my rate limit. Please wait a moment before sending another message.";
     } else if (error.message.includes('401')) {
+      errorMessage = "There seems to be an issue with my authentication. Please check your API key in settings.";
       toast.error("Authentication failed. Please check your API key.");
-      return "There seems to be an issue with my authentication. Please check your API key in settings.";
     }
   }
   
-  // Generic error message as fallback
-  toast.error("Failed to get response from Claude AI");
-  return "I'm sorry, I encountered an error processing your request. Please try again later.";
+  // Add error message to chat context
+  const assistantErrorMessage: ChatMessage = {
+    role: 'assistant',
+    content: errorMessage,
+    timestamp: Date.now()
+  };
+  
+  chatContextManager.addMessage(assistantErrorMessage);
+  
+  return errorMessage;
 }

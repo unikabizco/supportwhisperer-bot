@@ -18,6 +18,11 @@ export async function sendWithRetry(
   attempt = 1
 ): Promise<Response> {
   try {
+    // First check for network connectivity
+    if (!navigator.onLine) {
+      throw new Error('offline');
+    }
+    
     // Create an AbortController for timeout management
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT_MS);
@@ -69,13 +74,19 @@ export async function sendWithRetry(
         throw new Error('timeout');
       }
       
+      // Rethrow network errors with better detection
+      if (error instanceof TypeError && error.message.includes('NetworkError')) {
+        throw new Error('network');
+      }
+      
       throw error;
     }
   } catch (error) {
+    // Check if retry is appropriate
     if (attempt < MAX_RETRIES && 
-        !(error instanceof TypeError) && 
-        error.message !== 'timeout' && 
-        error.message !== 'offline') {
+        error.message !== 'offline' &&
+        error.message !== 'timeout' &&
+        error.message !== 'network') {
       const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1);
       console.log(`Retrying request (attempt ${attempt + 1}) after ${delay}ms`);
       

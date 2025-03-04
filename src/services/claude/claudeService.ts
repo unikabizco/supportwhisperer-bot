@@ -29,6 +29,11 @@ export const claudeService = {
     }
     
     try {
+      // First check internet connectivity
+      if (!navigator.onLine) {
+        throw new Error('offline');
+      }
+
       // Add the new message to context
       chatContextManager.addMessage(newMessage);
       
@@ -47,11 +52,6 @@ export const claudeService = {
         temperature: 0.7,
         system: enhancedSystemPrompt
       };
-
-      // Check internet connection before sending request
-      if (!navigator.onLine) {
-        throw new Error('offline');
-      }
 
       // Send request with retries
       const response = await sendWithRetry(request, apiKey);

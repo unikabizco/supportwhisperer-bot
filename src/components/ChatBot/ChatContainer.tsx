@@ -26,17 +26,21 @@ const ChatContainer = () => {
     checkForAutomatedResponse
   } = useChatMessages(isOpen);
   
-  const isOnline = useNetworkStatus(isOpen);
+  const externalNetworkStatus = useNetworkStatus(isOpen);
   const { containerRef, scrollToBottom } = useChatScroll(messages, isOpen);
   
   const {
     isLoading,
     showSettings,
     setShowSettings,
-    handleSendMessage
+    handleSendMessage,
+    isOnline
   } = useChatMessageHandling(messages, setMessages, checkForAutomatedResponse, scrollToBottom);
   
   const { handleClearConversation } = useConversationManagement(setMessages);
+
+  // Use both the hook's internal network status and the external one
+  const combinedNetworkStatus = isOnline && externalNetworkStatus;
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
@@ -57,7 +61,7 @@ const ChatContainer = () => {
             onClose={() => setIsOpen(false)}
             onShowSettings={() => setShowSettings(true)}
             onClearConversation={handleClearConversation}
-            isOnline={isOnline}
+            isOnline={combinedNetworkStatus}
             useAutomation={useAutomation}
             onToggleAutomation={() => setUseAutomation(!useAutomation)}
           />
@@ -67,7 +71,11 @@ const ChatContainer = () => {
             detectIntent={detectMessageIntent}
           />
           
-          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!isOnline} />
+          <ChatInput 
+            onSendMessage={handleSendMessage} 
+            isLoading={isLoading} 
+            disabled={!combinedNetworkStatus} 
+          />
           
           <ApiKeyModal 
             isOpen={showSettings} 
