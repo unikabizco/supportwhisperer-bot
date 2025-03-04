@@ -5,8 +5,8 @@ import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 import ApiKeyModal from './ApiKeyModal';
 import { cn } from '@/lib/utils';
-import { claudeService } from '@/services/claudeService';
-import { chatContextManager, ChatMessage } from '@/services/chatContextManager';
+import { claudeService } from '@/services/claude';
+import { chatContextManager, ChatMessage } from '@/services/chat';
 import { toast } from 'sonner';
 
 const ChatContainer = () => {
