@@ -53,6 +53,7 @@ Always consider the full conversation context before responding.`;
 // Define retry configuration
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
+const CONNECTION_TIMEOUT_MS = 15000; // 15 second timeout
 
 // Service to handle Claude AI interactions
 export const claudeService = {
@@ -92,6 +93,11 @@ export const claudeService = {
         system: enhancedSystemPrompt
       };
 
+      // Check internet connection before sending request
+      if (!navigator.onLine) {
+        throw new Error('offline');
+      }
+
       // Send request with retries
       const response = await this.sendWithRetry(request, apiKey);
       const data = await response.json() as ClaudeResponse;
@@ -109,19 +115,28 @@ export const claudeService = {
       console.error('Error calling Claude API:', error);
       
       // Provide more specific error message based on error type
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        toast.error("Network error when connecting to Claude AI. Please check your internet connection.");
-        return "I'm having trouble connecting to my knowledge base due to network issues. Please check your internet connection and try again in a moment.";
-      } else if (error instanceof Error && error.message.includes('429')) {
-        toast.error("Rate limit exceeded. Please try again in a few moments.");
-        return "I've reached my rate limit. Please wait a moment before sending another message.";
-      } else if (error instanceof Error && error.message.includes('401')) {
-        toast.error("Authentication failed. Please check your API key.");
-        return "There seems to be an issue with my authentication. Please check your API key in settings.";
-      } else {
-        toast.error("Failed to get response from Claude AI");
-        return "I'm sorry, I encountered an error processing your request. Please try again later.";
+      if (error instanceof Error) {
+        if (error.message === 'offline') {
+          toast.error("You are currently offline. Please check your internet connection.");
+          return "It looks like you're currently offline. Please check your internet connection and try again when you're back online.";
+        } else if (error.message === 'timeout') {
+          toast.error("Request timed out. The Claude AI service might be experiencing high traffic.");
+          return "I'm sorry, but the request timed out. Our AI service might be experiencing high traffic. Please try again in a few moments.";
+        } else if (error.message.includes('fetch') || error.message.includes('network')) {
+          toast.error("Network error when connecting to Claude AI. Please check your internet connection.");
+          return "I'm having trouble connecting to my knowledge base due to network issues. Please check your internet connection and try again in a moment. If the problem persists, our servers might be experiencing issues.";
+        } else if (error.message.includes('429')) {
+          toast.error("Rate limit exceeded. Please try again in a few moments.");
+          return "I've reached my rate limit. Please wait a moment before sending another message.";
+        } else if (error.message.includes('401')) {
+          toast.error("Authentication failed. Please check your API key.");
+          return "There seems to be an issue with my authentication. Please check your API key in settings.";
+        }
       }
+      
+      // Generic error message as fallback
+      toast.error("Failed to get response from Claude AI");
+      return "I'm sorry, I encountered an error processing your request. Please try again later.";
     }
   },
   
@@ -130,41 +145,64 @@ export const claudeService = {
    */
   async sendWithRetry(request: ClaudeRequest, apiKey: string, attempt = 1): Promise<Response> {
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify(request)
-      });
+      // Create an AbortController for timeout management
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT_MS);
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Claude API error:', errorData);
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify(request),
+          signal: controller.signal
+        });
         
-        // If we've reached max retries, throw an error
-        if (attempt >= MAX_RETRIES) {
+        // Clear the timeout since the request completed
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Claude API error:', errorData);
+          
+          // If we've reached max retries, throw an error
+          if (attempt >= MAX_RETRIES) {
+            throw new Error(`API error: ${response.status}`);
+          }
+          
+          // For 429 (rate limit) or 5xx errors, retry with exponential backoff
+          if (response.status === 429 || response.status >= 500) {
+            const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+            console.log(`Retrying request (attempt ${attempt + 1}) after ${delay}ms`);
+            
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return this.sendWithRetry(request, apiKey, attempt + 1);
+          }
+          
+          // For other errors, throw immediately
           throw new Error(`API error: ${response.status}`);
         }
         
-        // For 429 (rate limit) or 5xx errors, retry with exponential backoff
-        if (response.status === 429 || response.status >= 500) {
-          const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1);
-          console.log(`Retrying request (attempt ${attempt + 1}) after ${delay}ms`);
-          
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.sendWithRetry(request, apiKey, attempt + 1);
+        return response;
+      } catch (error) {
+        // Clear the timeout to prevent memory leaks
+        clearTimeout(timeoutId);
+        
+        // Check if the error was caused by the timeout
+        if (error.name === 'AbortError') {
+          throw new Error('timeout');
         }
         
-        // For other errors, throw immediately
-        throw new Error(`API error: ${response.status}`);
+        throw error;
       }
-      
-      return response;
     } catch (error) {
-      if (attempt < MAX_RETRIES && !(error instanceof TypeError)) {
+      if (attempt < MAX_RETRIES && 
+          !(error instanceof TypeError) && 
+          error.message !== 'timeout' && 
+          error.message !== 'offline') {
         const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1);
         console.log(`Retrying request (attempt ${attempt + 1}) after ${delay}ms`);
         

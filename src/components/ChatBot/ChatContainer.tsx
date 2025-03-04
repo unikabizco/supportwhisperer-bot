@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Settings, RotateCcw } from 'lucide-react';
+import { MessageCircle, X, Settings, RotateCcw, Wifi, WifiOff } from 'lucide-react';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 import ApiKeyModal from './ApiKeyModal';
@@ -14,7 +14,33 @@ const ChatContainer = () => {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant' | 'system'; content: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (isOpen) {
+        toast.success("You're back online!");
+      }
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+      if (isOpen) {
+        toast.error("You're currently offline. Some features may be unavailable.");
+      }
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [isOpen]);
 
   const scrollToBottom = () => {
     if (containerRef.current) {
@@ -54,6 +80,12 @@ const ChatContainer = () => {
   const handleSendMessage = async (message: string) => {
     if (!message.trim()) return;
     
+    // Check if online before proceeding
+    if (!navigator.onLine) {
+      toast.error("You're offline. Please check your internet connection.");
+      return;
+    }
+    
     const userMessage: ChatMessage = { 
       role: 'user', 
       content: message,
@@ -83,17 +115,21 @@ const ChatContainer = () => {
       }
     } catch (error) {
       console.error('Error getting AI response:', error);
-      toast.error("Failed to get a response. Please try again.");
       
-      // Add error message for user
-      const errorMessage: ChatMessage = {
-        role: 'assistant', 
-        content: "I'm sorry, I'm having trouble connecting to my knowledge base. Please try again or contact our support team directly.",
-        timestamp: Date.now()
-      };
-      
-      chatContextManager.addMessage(errorMessage);
-      setMessages(prev => [...prev, errorMessage]);
+      // Add error message for user if not already handled by the service
+      if (!error.message || (
+          error.message !== 'offline' && 
+          error.message !== 'timeout' && 
+          !error.message.includes('API error'))) {
+        const errorMessage: ChatMessage = {
+          role: 'assistant', 
+          content: "I'm sorry, I'm having trouble connecting to my knowledge base. Please try again or contact our support team directly.",
+          timestamp: Date.now()
+        };
+        
+        chatContextManager.addMessage(errorMessage);
+        setMessages(prev => [...prev, errorMessage]);
+      }
     } finally {
       setIsLoading(false);
       setTimeout(scrollToBottom, 100);
@@ -141,6 +177,14 @@ const ChatContainer = () => {
           <div className="flex items-center justify-between p-4 border-b">
             <h2 className="text-lg font-semibold">Customer Support</h2>
             <div className="flex items-center gap-2">
+              {/* Network status indicator */}
+              <div className="mr-1" title={isOnline ? "Online" : "Offline"}>
+                {isOnline ? (
+                  <Wifi size={16} className="text-green-500" />
+                ) : (
+                  <WifiOff size={16} className="text-red-500" />
+                )}
+              </div>
               <button
                 onClick={handleClearConversation}
                 className="p-1 rounded-full hover:bg-gray-100 transition-colors"
@@ -167,7 +211,7 @@ const ChatContainer = () => {
           </div>
 
           <ChatMessages messages={messages} />
-          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} disabled={!isOnline} />
           
           <ApiKeyModal 
             isOpen={showSettings} 

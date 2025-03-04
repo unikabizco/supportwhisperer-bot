@@ -1,46 +1,54 @@
 
 import React, { useState } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { SendIcon } from 'lucide-react';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
   isLoading?: boolean;
+  disabled?: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading = false }) => {
-  const [message, setMessage] = useState('');
+const ChatInput: React.FC<ChatInputProps> = ({ 
+  onSendMessage, 
+  isLoading = false,
+  disabled = false
+}) => {
+  const [inputValue, setInputValue] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() && !isLoading) {
-      onSendMessage(message);
-      setMessage('');
+    if (inputValue.trim() && !isLoading && !disabled) {
+      onSendMessage(inputValue);
+      setInputValue('');
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border-t p-4">
-      <div className="flex gap-2">
+    <form 
+      onSubmit={handleSubmit}
+      className="border-t p-4 bg-white bg-opacity-90"
+    >
+      <div className="relative flex items-center">
         <input
           type="text"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type your message..."
-          disabled={isLoading}
-          className="flex-1 px-4 py-2 rounded-full border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-70"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder={disabled ? "You're offline. Reconnect to send messages." : "Type your message..."}
+          className="w-full p-2 pr-10 border rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          disabled={isLoading || disabled}
         />
         <button
           type="submit"
-          disabled={isLoading || !message.trim()}
-          className="p-2 rounded-full bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+          className="absolute right-2 p-1.5 rounded-full bg-primary text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
+          disabled={!inputValue.trim() || isLoading || disabled}
+          aria-label="Send message"
         >
-          {isLoading ? (
-            <Loader2 size={20} className="animate-spin" />
-          ) : (
-            <Send size={20} />
-          )}
+          <SendIcon size={16} />
         </button>
       </div>
+      {isLoading && (
+        <p className="text-xs text-gray-500 mt-1 ml-2">Processing your request...</p>
+      )}
     </form>
   );
 };
