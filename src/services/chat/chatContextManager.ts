@@ -1,3 +1,4 @@
+
 /**
  * Chat Context Management Service
  * Handles efficient storage and retrieval of conversation history
@@ -9,7 +10,7 @@ import { saveContext, loadContext, clearContext } from './contextStorage';
 
 /**
  * ChatContextManager provides methods to efficiently manage conversation context
- * for Claude AI, optimizing for token usage while preserving critical information
+ * for AI models, optimizing for token usage while preserving critical information
  */
 export const chatContextManager = {
   /**
@@ -65,12 +66,23 @@ export const chatContextManager = {
   /**
    * Gets all messages from context formatted for Claude API
    */
-  getMessagesForClaudeAPI(): ChatMessage[] {
+  getMessagesForClaudeAPI(): { role: string; content: string; }[] {
     const context = this.getContext();
     if (!context) return [];
     
-    // Return only the messages array for Claude API
-    return context.messages;
+    // Return only the messages array for Claude API (excluding system messages)
+    return context.messages.filter(msg => msg.role !== 'system');
+  },
+  
+  /**
+   * Gets all messages from context formatted for OpenAI API
+   */
+  getMessagesForOpenAIAPI(): { role: string; content: string; }[] {
+    const context = this.getContext();
+    if (!context) return [];
+    
+    // Return only the messages array for OpenAI API (excluding system messages)
+    return context.messages.filter(msg => msg.role !== 'system');
   },
   
   /**

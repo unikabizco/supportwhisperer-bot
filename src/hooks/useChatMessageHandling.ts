@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { chatContextManager, ChatMessage } from '@/services/chat';
-import { claudeService } from '@/services/claude';
+import { aiService } from '@/services/ai';
 import { toast } from 'sonner';
 
 /**
@@ -79,20 +79,22 @@ export const useChatMessageHandling = (
       return;
     }
     
-    // If no automated response, proceed with Claude API
+    // If no automated response, proceed with AI API
     setIsLoading(true);
     
     try {
-      // Check if API key exists
-      const apiKey = localStorage.getItem('claude_api_key');
-      if (!apiKey) {
+      // Check if either API key exists
+      const claudeApiKey = localStorage.getItem('claude_api_key');
+      const openaiApiKey = localStorage.getItem('openai_api_key');
+      
+      if (!claudeApiKey && !openaiApiKey) {
         setShowSettings(true);
         setIsLoading(false);
         return;
       }
       
-      // Send to Claude AI with updated service
-      const assistantResponse = await claudeService.sendMessage(userMessage);
+      // Send to AI service with unified service
+      const assistantResponse = await aiService.sendMessage(userMessage);
       
       // Get updated message list from context manager
       const updatedContext = chatContextManager.getContext();
