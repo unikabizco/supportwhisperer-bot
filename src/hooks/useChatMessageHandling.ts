@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { chatContextManager, ChatMessage } from '@/services/chat';
 import { aiService } from '@/services/ai';
 import { toast } from 'sonner';
+import { useBrowsingStatus } from './useBrowsingStatus';
 
 /**
  * Hook for handling sending messages and getting AI responses
@@ -16,6 +17,7 @@ export const useChatMessageHandling = (
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const { isBrowsingAllowed } = useBrowsingStatus();
 
   // Add event listeners for online/offline status
   useEffect(() => {
@@ -93,6 +95,12 @@ export const useChatMessageHandling = (
         return;
       }
       
+      // Check if this might be a browsing request and browsing is unavailable
+      const browsingQuery = aiService.detectBrowsingRequest(message);
+      if (browsingQuery && !isBrowsingAllowed) {
+        toast.warning("Web browsing capability is limited in this environment. The AI will use its built-in knowledge instead.");
+      }
+      
       // Send to AI service with unified service
       const assistantResponse = await aiService.sendMessage(userMessage);
       
@@ -105,7 +113,7 @@ export const useChatMessageHandling = (
       console.error('Error getting AI response:', error);
       
       // Add error message for user if not already handled by the service
-      if (!error.message || (
+      if (!(error instanceof Error) || (
           error.message !== 'offline' && 
           error.message !== 'timeout' && 
           !error.message.includes('API error'))) {
@@ -130,6 +138,7 @@ export const useChatMessageHandling = (
     showSettings,
     setShowSettings,
     handleSendMessage,
-    isOnline
+    isOnline,
+    isBrowsingAllowed
   };
 };

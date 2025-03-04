@@ -1,4 +1,3 @@
-
 /**
  * AI Provider Service
  * Determines which AI provider to use based on user's selection
@@ -53,12 +52,52 @@ export const aiService = {
         
         if (isAmazonQuery) {
           console.log('Processing as Amazon query');
-          const amazonInfo = await this.handleAmazonQuery(message.content);
+          
+          try {
+            const amazonInfo = await this.handleAmazonQuery(message.content);
+            
+            // Now send the enriched info to the AI for a natural language response
+            const enhancedMessage: ChatMessage = {
+              ...message,
+              content: message.content + '\n\n[RETRIEVED DATA]: ' + amazonInfo
+            };
+            
+            // Continue with regular AI processing for the enhanced message
+            if (selectedProvider === 'claude') {
+              if (!claudeApiKey) throw new Error('missing_api_key_claude');
+              return await claudeService.sendMessage(enhancedMessage);
+            } else {
+              if (!openaiApiKey) throw new Error('missing_api_key_openai');
+              return await openaiService.sendMessage(enhancedMessage);
+            }
+          } catch (browsingError) {
+            console.error('Error with Amazon browsing:', browsingError);
+            // If Amazon browsing fails, still provide the error info to the AI
+            const errorMessage: ChatMessage = {
+              ...message,
+              content: message.content + '\n\n[RETRIEVED DATA]: ' + 
+                      `I tried searching for "${browsingQuery}" on Amazon but encountered an error: ${browsingError.message || 'Unknown error'}`
+            };
+            
+            // Continue with regular AI processing with the error info
+            if (selectedProvider === 'claude') {
+              if (!claudeApiKey) throw new Error('missing_api_key_claude');
+              return await claudeService.sendMessage(errorMessage);
+            } else {
+              if (!openaiApiKey) throw new Error('missing_api_key_openai');
+              return await openaiService.sendMessage(errorMessage);
+            }
+          }
+        }
+        
+        // Handle general browsing request with better error handling
+        try {
+          const browsingInfo = await this.handleBrowsingRequest(browsingQuery);
           
           // Now send the enriched info to the AI for a natural language response
           const enhancedMessage: ChatMessage = {
             ...message,
-            content: message.content + '\n\n[RETRIEVED DATA]: ' + amazonInfo
+            content: message.content + '\n\n[RETRIEVED DATA]: ' + browsingInfo
           };
           
           // Continue with regular AI processing for the enhanced message
@@ -69,24 +108,23 @@ export const aiService = {
             if (!openaiApiKey) throw new Error('missing_api_key_openai');
             return await openaiService.sendMessage(enhancedMessage);
           }
-        }
-        
-        // Handle general browsing request
-        const browsingInfo = await this.handleBrowsingRequest(browsingQuery);
-        
-        // Now send the enriched info to the AI for a natural language response
-        const enhancedMessage: ChatMessage = {
-          ...message,
-          content: message.content + '\n\n[RETRIEVED DATA]: ' + browsingInfo
-        };
-        
-        // Continue with regular AI processing for the enhanced message
-        if (selectedProvider === 'claude') {
-          if (!claudeApiKey) throw new Error('missing_api_key_claude');
-          return await claudeService.sendMessage(enhancedMessage);
-        } else {
-          if (!openaiApiKey) throw new Error('missing_api_key_openai');
-          return await openaiService.sendMessage(enhancedMessage);
+        } catch (browsingError) {
+          console.error('Error with general browsing:', browsingError);
+          // If browsing fails, still provide the error info to the AI
+          const errorMessage: ChatMessage = {
+            ...message,
+            content: message.content + '\n\n[RETRIEVED DATA]: ' + 
+                    `Failed to retrieve information: ${browsingError.message || 'Unknown error'}`
+          };
+          
+          // Continue with regular AI processing with the error info
+          if (selectedProvider === 'claude') {
+            if (!claudeApiKey) throw new Error('missing_api_key_claude');
+            return await claudeService.sendMessage(errorMessage);
+          } else {
+            if (!openaiApiKey) throw new Error('missing_api_key_openai');
+            return await openaiService.sendMessage(errorMessage);
+          }
         }
       }
       
@@ -215,7 +253,7 @@ export const aiService = {
       
       console.log(`Browsing URL: ${url}`);
       
-      // Use browsing service to fetch content
+      // Use browsing service to fetch content with improved error handling
       const result = await browsingService.browseUrl({
         url,
         extractionType: 'full',
@@ -237,9 +275,11 @@ export const aiService = {
       
       // Add content summary or extract
       if (result.content) {
-        // Limit content to a reasonable size (first 500 chars)
+        // Limit content to a reasonable size (first 1000 chars)
         const contentPreview = result.content.substring(0, 1000);
         formattedContent += `Content Extract:\n${contentPreview}${result.content.length > 1000 ? '...' : ''}`;
+      } else {
+        formattedContent += `No content was extracted from this page.`;
       }
       
       // Note if this came from cache
@@ -250,7 +290,7 @@ export const aiService = {
       return formattedContent;
     } catch (error) {
       console.error('Error handling browsing request:', error);
-      return `I encountered an error when trying to browse for information about "${query}". ${error.message || ''}`;
+      throw new Error(`Failed to browse for information about "${query}": ${error.message || 'Unknown error'}`);
     }
   },
   
@@ -289,49 +329,86 @@ export const aiService = {
       
       console.log(`Searching Amazon for: ${productQuery}`);
       
-      // Search for the product
-      const searchResult = await amazonService.searchProducts({
-        keywords: productQuery,
-        maxResults: 1
+      // First try using the Amazon service
+      try {
+        const searchResult = await amazonService.searchProducts({
+          keywords: productQuery,
+          maxResults: 1
+        });
+        
+        if (searchResult.success && searchResult.products.length > 0) {
+          const product = searchResult.products[0];
+          
+          // Format the product information
+          let formattedInfo = '';
+          
+          formattedInfo += `Amazon Product Information:\n`;
+          formattedInfo += `Title: ${product.title}\n`;
+          formattedInfo += `Price: ${product.price?.formattedPrice || 'Not available'}\n`;
+          
+          if (product.rating) {
+            formattedInfo += `Rating: ${product.rating.value} out of 5 (${product.rating.count} reviews)\n`;
+          }
+          
+          if (product.features && product.features.length > 0) {
+            formattedInfo += `\nKey Features:\n`;
+            product.features.forEach(feature => {
+              formattedInfo += `- ${feature}\n`;
+            });
+          }
+          
+          if (product.description) {
+            formattedInfo += `\nDescription: ${product.description}\n`;
+          }
+          
+          formattedInfo += `\nAmazon URL: ${product.url}\n`;
+          formattedInfo += `Product ID (ASIN): ${product.asin}\n`;
+          formattedInfo += `Information retrieved: ${new Date().toLocaleString()}\n`;
+          
+          return formattedInfo;
+        }
+      } catch (amazonApiError) {
+        console.error('Amazon API error, falling back to direct browsing:', amazonApiError);
+        // Fall through to the browsing approach
+      }
+      
+      // If Amazon API method failed, try direct browsing
+      const amazonUrl = `https://www.amazon.com/s?k=${encodeURIComponent(productQuery)}`;
+      
+      // Use browsing service as fallback
+      const browsingResult = await browsingService.browseUrl({
+        url: amazonUrl,
+        extractionType: 'product',
+        cacheTime: 1800 // 30 minutes
       });
       
-      if (!searchResult.success || searchResult.products.length === 0) {
-        return `I tried searching for "${productQuery}" on Amazon but couldn't find relevant product information. ${searchResult.error || ''}`;
+      if (!browsingResult.success) {
+        throw new Error(browsingResult.error || 'Failed to retrieve Amazon product information');
       }
       
-      // Get the first product
-      const product = searchResult.products[0];
-      
-      // Format the product information
+      // Format the browsing result
       let formattedInfo = '';
       
-      formattedInfo += `Amazon Product Information:\n`;
-      formattedInfo += `Title: ${product.title}\n`;
-      formattedInfo += `Price: ${product.price?.formattedPrice || 'Not available'}\n`;
+      formattedInfo += `Amazon Search Results:\n`;
+      formattedInfo += `Search query: "${productQuery}"\n`;
+      formattedInfo += `Source: ${browsingResult.url}\n\n`;
       
-      if (product.rating) {
-        formattedInfo += `Rating: ${product.rating.value} out of 5 (${product.rating.count} reviews)\n`;
+      if (browsingResult.metadata?.title) {
+        formattedInfo += `Page title: ${browsingResult.metadata.title}\n\n`;
       }
       
-      if (product.features && product.features.length > 0) {
-        formattedInfo += `\nKey Features:\n`;
-        product.features.forEach(feature => {
-          formattedInfo += `- ${feature}\n`;
-        });
+      if (browsingResult.content) {
+        // Limit content to a reasonable size
+        const contentPreview = browsingResult.content.substring(0, 1000);
+        formattedInfo += `Content extract:\n${contentPreview}${browsingResult.content.length > 1000 ? '...' : ''}`;
+      } else {
+        formattedInfo += `No product information could be extracted.`;
       }
-      
-      if (product.description) {
-        formattedInfo += `\nDescription: ${product.description}\n`;
-      }
-      
-      formattedInfo += `\nAmazon URL: ${product.url}\n`;
-      formattedInfo += `Product ID (ASIN): ${product.asin}\n`;
-      formattedInfo += `Information retrieved: ${new Date().toLocaleString()}\n`;
       
       return formattedInfo;
     } catch (error) {
       console.error('Error handling Amazon query:', error);
-      return `I encountered an error when trying to get Amazon product information. ${error.message || ''}`;
+      throw new Error(`Failed to get Amazon product information: ${error.message || 'Unknown error'}`);
     }
   }
 };
