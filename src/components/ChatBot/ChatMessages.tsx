@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ChatMessagesProps {
@@ -7,6 +7,12 @@ interface ChatMessagesProps {
 }
 
 const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {messages.map((message, index) => (
@@ -25,10 +31,16 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({ messages }) => {
                 : "bg-gray-100 text-gray-800 rounded-bl-none"
             )}
           >
-            {message.content}
+            {message.content.split('\n').map((text, i) => (
+              <React.Fragment key={i}>
+                {text}
+                {i !== message.content.split('\n').length - 1 && <br />}
+              </React.Fragment>
+            ))}
           </div>
         </div>
       ))}
+      <div ref={messagesEndRef} />
     </div>
   );
 };
