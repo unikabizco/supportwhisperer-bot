@@ -5,3 +5,8 @@
  */
 export * from './types';
 export { amazonService } from './amazonService';
+export { amazonCache } from './amazonCache';
+export { amazonUrlUtils } from './amazonUrlUtils';
+export { amazonProductSearch } from './amazonProductSearch';
+export { amazonProductDetails } from './amazonProductDetails';
+export { amazonPriceComparison } from './amazonPriceComparison';
